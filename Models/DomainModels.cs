@@ -23,6 +23,8 @@ public class 競走馬
     public int ゲート { get; set; }
     public int 調子 { get; set; } = 100;
     public int 疲労 { get; set; } = 0; // 0-100, 100 is exhausted
+    public string 父名 { get; set; } = "不明";
+    public string 母名 { get; set; } = "不明";
 
     // 市場価値
     public decimal 価格 { get; set; } = 1000m;

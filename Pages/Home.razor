@@ -7,10 +7,10 @@
 <PageTitle>運用ダッシュボード</PageTitle>
 
 <MudGrid>
-    <MudItem xs="12" md="8">
+    <MudItem xs="12" md="12">
         <RaceMonitor />
     </MudItem>
-    <MudItem xs="12" md="4">
+    <MudItem xs="12" md="12">
         <MudPaper Class="pa-4" Elevation="3">
             <MudText Typo="Typo.h6">オッズ市場</MudText>
             <MudText Typo="Typo.body2">投票残り: @運用.投票残り秒 秒</MudText>
@@ -19,12 +19,18 @@
             <MudTable Items="@運用.現在のレース.出走馬リスト" Dense="true" Hover="true" Striped="true">
                 <HeaderContent>
                     <MudTh>馬名</MudTh>
+                    <MudTh>情報</MudTh>
                     <MudTh>単勝</MudTh>
                     <MudTh>複勝</MudTh>
                     <MudTh>投票</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="馬名">@context.名前</MudTd>
+                    <MudTd DataLabel="情報">
+                        <MudText Typo="Typo.caption">@表示性別年齢(context) ・ @context.脚質</MudText>
+                        <MudText Typo="Typo.caption">@表示成績(context)</MudText>
+                        <MudText Typo="Typo.caption">血統: @表示血統(context)</MudText>
+                    </MudTd>
                     <MudTd DataLabel="単勝">
                          <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@表示オッズ(context.Id)</MudChip>
                     </MudTd>
@@ -168,6 +174,26 @@
         var odds = オッズ.現在複勝オッズ(馬Id);
         var text = odds <= 0 ? "x-" : $"x{odds:0.0}";
         return new MarkupString(text);
+    }
+
+    private string 表示性別年齢(競走馬 馬)
+    {
+        var 性別記号 = 馬.性別 == 性別.牡 ? "牡" : "牝";
+        return $"{性別記号}{馬.年齢}";
+    }
+
+    private string 表示成績(競走馬 馬)
+    {
+        if (馬.出走数 <= 0) return "成績: 未出走";
+        var 勝率 = (int)Math.Round((馬.勝利数 / (double)馬.出走数) * 100.0);
+        return $"成績: {馬.勝利数}/{馬.出走数} (勝率{勝率}%)";
+    }
+
+    private string 表示血統(競走馬 馬)
+    {
+        var 父 = string.IsNullOrWhiteSpace(馬.父名) ? "不明" : 馬.父名;
+        var 母 = string.IsNullOrWhiteSpace(馬.母名) ? "不明" : 馬.母名;
+        return $"{父} × {母}";
     }
 
     private int _購入金額 = 100;
