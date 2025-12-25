@@ -1,0 +1,69 @@
+@inject 馬市場サービス 市場
+@inject 財布サービス 財布
+@implements IDisposable
+
+<MudPaper Class="pa-4 mb-4" Elevation="3">
+    <MudText Typo="Typo.h5" GutterBottom="true">セレクトセール (馬市場)</MudText>
+    <MudText Typo="Typo.body2" Class="mb-4">未来の名馬を発掘しましょう。</MudText>
+
+    @if (市場.販売馬リスト.Any())
+    {
+        <MudGrid>
+            @foreach (var 馬 in 市場.販売馬リスト)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard>
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">@馬.名前</MudText>
+                                <MudText Typo="Typo.body2">@馬.年齢 歳</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudIcon Icon="@Icons.Material.Filled.SportsScore" Style="@($"color: {馬.毛色}; font-size: 32px;")" />
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudStack Row="true">
+                                <MudText>SP: @馬.スピード</MudText>
+                                <MudText>ST: @馬.スタミナ</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.h6" Class="mt-2" Color="Color.Warning">¥@馬.価格.ToString("N0")</MudText>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                       Disabled="@(財布.ユーザー.所持金 < 馬.価格)"
+                                       OnClick="@(() => 購入(馬))">
+                                購入
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Warning">現在、市場に出ている馬はいません。</MudAlert>
+    }
+    
+    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Class="mt-4" OnClick="@(() => 市場.市場更新())">市場更新</MudButton>
+</MudPaper>
+
+@code {
+    protected override void OnInitialized()
+    {
+        市場.市場更新時 += StateHasChanged;
+        財布.残高変動時 += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        市場.市場更新時 -= StateHasChanged;
+        財布.残高変動時 -= StateHasChanged;
+    }
+
+    private void 購入(競走馬 馬)
+    {
+        市場.馬購入(馬);
+    }
+}

@@ -1,0 +1,36 @@
+﻿@inherits LayoutComponentBase
+@inject 財布サービス 財布
+@inject レース運用サービス 運用
+@implements IDisposable
+
+<MudThemeProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudText Typo="Typo.h5" Class="ml-3">競走馬運用管理システム</MudText>
+        <MudSpacer />
+        <MudChip T="string" Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Success">@財布.ユーザー.所持金.ToString("N0")</MudChip>
+    </MudAppBar>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    protected override void OnInitialized()
+    {
+        運用.レース終了時 += 財布.レース結果処理;
+        財布.残高変動時 += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        運用.レース終了時 -= 財布.レース結果処理;
+        財布.残高変動時 -= StateHasChanged;
+    }
+}

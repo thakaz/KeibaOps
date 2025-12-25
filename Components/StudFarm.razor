@@ -1,0 +1,89 @@
+@inject 財布サービス 財布
+@inject 繁殖サービス 繁殖
+@implements IDisposable
+
+<MudPaper Class="pa-4 mt-4" Elevation="3">
+    <MudText Typo="Typo.h5" GutterBottom="true">生産牧場 (スタッドファーム)</MudText>
+    <MudText Typo="Typo.body2" Class="mb-4">引退した馬を組み合わせて最強馬を作りましょう。</MudText>
+
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudSelect T="競走馬" Label="種牡馬を選択 (父)" @bind-Value="選択された父" ToStringFunc="@(h => h?.名前)">
+                @foreach (var 馬 in 引退馬リスト.Where(h => h.性別 == 性別.牡))
+                {
+                    <MudSelectItem Value="@馬">@馬.名前 (SP:@馬.スピード / ST:@馬.スタミナ)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudSelect T="競走馬" Label="繁殖牝馬を選択 (母)" @bind-Value="選択された母" ToStringFunc="@(h => h?.名前)">
+                @foreach (var 馬 in 引退馬リスト.Where(h => h.性別 == 性別.牝))
+                {
+                    <MudSelectItem Value="@馬">@馬.名前 (SP:@馬.スピード / ST:@馬.スタミナ)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" 
+                       Disabled="@(選択された父 == null || 選択された母 == null)"
+                       OnClick="配合実行">
+                配合実行
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @if (新馬 != null)
+    {
+        <MudAlert Severity="Severity.Success" Class="mt-4">
+            誕生しました！: <strong>@新馬.名前</strong> (SP:@新馬.スピード / ST:@新馬.スタミナ)
+            <br />
+            マイステーブルに追加されました。
+        </MudAlert>
+    }
+    
+    <MudText Typo="Typo.h6" Class="mt-4">在厩馬リスト (引退済み)</MudText>
+    @if (引退馬リスト.Any())
+    {
+        <MudList T="string">
+            @foreach (var 馬 in 引退馬リスト)
+            {
+                <MudListItem>
+                    <MudIcon Icon="@(馬.性別 == 性別.牡 ? Icons.Material.Filled.Male : Icons.Material.Filled.Female)" 
+                             Color="@(馬.性別 == 性別.牡 ? Color.Info : Color.Error)" Class="mr-2"/>
+                    @馬.名前 (SP:@馬.スピード / ST:@馬.スタミナ)
+                </MudListItem>
+            }
+        </MudList>
+    }
+    else
+    {
+        <MudText>引退した馬はいません。</MudText>
+    }
+</MudPaper>
+
+@code {
+    private List<競走馬> 引退馬リスト => 財布.ユーザー.所有馬リスト.Where(h => h.状態 == 競走馬状態.引退).ToList();
+    private 競走馬? 選択された父;
+    private 競走馬? 選択された母;
+    private 競走馬? 新馬;
+
+    protected override void OnInitialized()
+    {
+        繁殖.牧場更新時 += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        繁殖.牧場更新時 -= StateHasChanged;
+    }
+
+    private void 配合実行()
+    {
+        if (選択された父 != null && 選択された母 != null)
+        {
+            新馬 = 繁殖.繁殖させる(選択された父, 選択された母);
+            選択された父 = null;
+            選択された母 = null;
+        }
+    }
+}

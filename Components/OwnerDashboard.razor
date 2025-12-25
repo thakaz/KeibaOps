@@ -1,0 +1,113 @@
+@inject 財布サービス 財布
+@inject 繁殖サービス 繁殖
+@inject レース運用サービス 運用
+@implements IDisposable
+
+<MudPaper Class="pa-4" Elevation="3">
+    <MudText Typo="Typo.h5" GutterBottom="true">マイステーブル (所有馬一覧)</MudText>
+
+    @if (財布.ユーザー.所有馬リスト.Any(h => h.状態 == 競走馬状態.現役))
+    {
+        <MudTable Items="@財布.ユーザー.所有馬リスト.Where(h => h.状態 == 競走馬状態.現役)" Dense="true" Hover="true" Striped="true">
+            <HeaderContent>
+                <MudTh>馬名</MudTh>
+                <MudTh>クラス</MudTh>
+                <MudTh>脚質</MudTh>
+                <MudTh>年齢</MudTh>
+                <MudTh>能力</MudTh>
+                <MudTh>疲労</MudTh>
+                <MudTh>獲得賞金</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="馬名">
+                    <MudIcon Icon="@Icons.Material.Filled.SportsScore" Style="@($"color: {context.毛色}; vertical-align: middle;")" Class="mr-2"/>
+                    @context.名前
+                </MudTd>
+                <MudTd DataLabel="クラス">
+                     <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.クラス</MudChip>
+                </MudTd>
+                <MudTd DataLabel="脚質">
+                     <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@context.脚質</MudChip>
+                </MudTd>
+                <MudTd DataLabel="年齢">@context.年齢 歳</MudTd>
+                <MudTd DataLabel="能力">@context.スピード / @context.スタミナ</MudTd>
+                <MudTd DataLabel="疲労">
+                     <MudTooltip Text="疲労度 (高いとレースに出られません)">
+                         <MudProgressLinear Color="@(context.疲労 > 50 ? Color.Error : Color.Success)" Value="@context.疲労" Max="100" Class="my-2"/>
+                     </MudTooltip>
+                </MudTd>
+                <MudTd DataLabel="獲得賞金">¥@context.獲得賞金.ToString("N0")</MudTd>
+                <MudTd DataLabel="操作">
+                    <MudStack Row="true">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" 
+                                   Disabled="@(!出走可能か(context))"
+                                   OnClick="@(() => 出走登録(context))">
+                            出走
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="@(() => 引退(context))">引退</MudButton>
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info">現役の所有馬はいません。市場で購入するか、生産しましょう。</MudAlert>
+    }
+</MudPaper>
+
+@code {
+    protected override void OnInitialized()
+    {
+        財布.残高変動時 += StateHasChanged;
+        繁殖.牧場更新時 += StateHasChanged;
+        運用.レース状態変更時 += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        財布.残高変動時 -= StateHasChanged;
+        繁殖.牧場更新時 -= StateHasChanged;
+        運用.レース状態変更時 -= StateHasChanged;
+    }
+
+    private bool 出走可能か(競走馬 馬)
+    {
+        // 既に登録済みか？
+        if (運用.現在のレース.出走馬リスト.Any(h => h.Id == 馬.Id)) return false;
+        
+        // 疲労チェック
+        if (馬.疲労 > 80) return false;
+        
+        // レース状態チェック
+        if (運用.現在のレース.状態 != レース状態.投票受付中) return false;
+        
+        // クラスチェック
+        if (運用.現在のレース.グレード == レースグレード.G1)
+        {
+             return 馬.クラス == 競走馬クラス.オープン;
+        }
+        
+        // 新馬は未勝利に出られる
+        if (馬.クラス == 競走馬クラス.新馬 && 運用.現在のレース.クラス == 競走馬クラス.未勝利)
+        {
+            return true;
+        }
+
+        return 馬.クラス == 運用.現在のレース.クラス;
+    }
+
+    private void 出走登録(競走馬 馬)
+    {
+        if (運用.出走登録(馬))
+        {
+            // 登録成功トーストとか出したいが割愛
+        }
+    }
+
+    private void 引退(競走馬 馬)
+    {
+        繁殖.引退させる(馬);
+    }
+}

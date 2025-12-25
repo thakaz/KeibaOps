@@ -1,0 +1,103 @@
+﻿@page "/"
+@inject レース運用サービス 運用
+@inject 財布サービス 財布
+@implements IDisposable
+
+<PageTitle>運用ダッシュボード</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <RaceMonitor />
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4" Elevation="3">
+            <MudText Typo="Typo.h6">オッズ市場</MudText>
+            <MudTable Items="@運用.現在のレース.出走馬リスト" Dense="true" Hover="true" Striped="true">
+                <HeaderContent>
+                    <MudTh>馬名</MudTh>
+                    <MudTh>倍率</MudTh>
+                    <MudTh>投票</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="馬名">@context.名前</MudTd>
+                    <MudTd DataLabel="倍率">
+                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">x@(Math.Round(100.0 / context.スピード * 5.0, 1))</MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Success" 
+                                   Disabled="@(運用.現在のレース.状態 != レース状態.投票受付中)"
+                                   OnClick="@(() => 馬券購入(context))">
+                            ¥100
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12" md="6">
+        <Marketplace />
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <OwnerDashboard />
+    </MudItem>
+    <MudItem xs="12">
+        <StudFarm />
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudPaper Class="pa-4">
+             <MudText Typo="Typo.h6">購入済み馬券</MudText>
+             @if (財布.ユーザー.購入馬券リスト.Any())
+             {
+                 <MudList T="string">
+                     @foreach (var 馬券 in 財布.ユーザー.購入馬券リスト.OrderByDescending(b => b.確定済み))
+                     {
+                         <MudListItem>
+                             <MudText>
+                                 @馬券.馬名 (x@馬券.オッズ) - ¥@馬券.購入額
+                                 @if(馬券.確定済み)
+                                 {
+                                     <MudChip T="string" Color="@(馬券.払戻金 > 0 ? Color.Success : Color.Error)" Size="Size.Small" Class="ml-2">
+                                         @(馬券.払戻金 > 0 ? $"+¥{馬券.払戻金}" : "ハズレ")
+                                     </MudChip>
+                                 }
+                                 else
+                                 {
+                                     <MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="ml-2">判定中</MudChip>
+                                 }
+                             </MudText>
+                         </MudListItem>
+                     }
+                 </MudList>
+             }
+             else
+             {
+                 <MudText>購入された馬券はありません。</MudText>
+             }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    protected override void OnInitialized()
+    {
+        運用.レース状態変更時 += StateHasChanged;
+        財布.残高変動時 += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        運用.レース状態変更時 -= StateHasChanged;
+        財布.残高変動時 -= StateHasChanged;
+    }
+
+    private void 馬券購入(競走馬 馬)
+    {
+        財布.馬券購入(運用.現在のレース, 馬, 100);
+    }
+}
