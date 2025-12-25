@@ -6,6 +6,29 @@
 <MudPaper Class="pa-4" Elevation="3">
     <MudText Typo="Typo.h5" GutterBottom="true">マイステーブル (所有馬一覧)</MudText>
 
+    <MudText Typo="Typo.h6" Class="mt-2">レース予定表</MudText>
+    @if (運用.予定レース一覧.Any())
+    {
+        <MudTable Items="@運用.予定レース一覧" Dense="true" Hover="true" Striped="true" Class="mb-4">
+            <HeaderContent>
+                <MudTh>レース名</MudTh>
+                <MudTh>クラス</MudTh>
+                <MudTh>コース</MudTh>
+                <MudTh>距離</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="レース名">@context.レース名</MudTd>
+                <MudTd DataLabel="クラス">@context.クラス</MudTd>
+                <MudTd DataLabel="コース">@context.コース</MudTd>
+                <MudTd DataLabel="距離">@context.距離 m</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+    else
+    {
+        <MudText Class="mb-4">予定レースがありません。</MudText>
+    }
+
     @if (財布.ユーザー.所有馬リスト.Any(h => h.状態 == 競走馬状態.現役))
     {
         <MudTable Items="@財布.ユーザー.所有馬リスト.Where(h => h.状態 == 競走馬状態.現役)" Dense="true" Hover="true" Striped="true">
@@ -74,28 +97,31 @@
 
     private bool 出走可能か(競走馬 馬)
     {
+        var 対象レース = 運用.次のレース;
+        if (対象レース == null) return false;
+
         // 既に登録済みか？
-        if (運用.現在のレース.出走馬リスト.Any(h => h.Id == 馬.Id)) return false;
+        if (対象レース.出走馬リスト.Any(h => h.Id == 馬.Id)) return false;
         
         // 疲労チェック
         if (馬.疲労 > 80) return false;
         
         // レース状態チェック
-        if (運用.現在のレース.状態 != レース状態.投票受付中) return false;
+        if (対象レース.状態 != レース状態.投票受付中) return false;
         
         // クラスチェック
-        if (運用.現在のレース.グレード == レースグレード.G1)
+        if (対象レース.グレード == レースグレード.G1)
         {
              return 馬.クラス == 競走馬クラス.オープン;
         }
         
         // 新馬は未勝利に出られる
-        if (馬.クラス == 競走馬クラス.新馬 && 運用.現在のレース.クラス == 競走馬クラス.未勝利)
+        if (馬.クラス == 競走馬クラス.新馬 && 対象レース.クラス == 競走馬クラス.未勝利)
         {
             return true;
         }
 
-        return 馬.クラス == 運用.現在のレース.クラス;
+        return 馬.クラス == 対象レース.クラス;
     }
 
     private void 出走登録(競走馬 馬)

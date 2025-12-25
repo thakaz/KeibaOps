@@ -7,22 +7,39 @@ public class レース運用サービス : IDisposable
 {
     private System.Timers.Timer _ループタイマー;
     public レース 現在のレース { get; private set; } = new();
+    private readonly List<レース> _予定レースリスト = new();
     public event Action? レース状態変更時;
+    public event Action<レース>? レース切替時;
     public event Action<レース>? レース終了時;
 
     private Random _乱数 = new Random();
     private 馬個体管理サービス _個体管理;
+    private const int 予定レース数 = 3;
 
     public レース運用サービス(馬個体管理サービス 個体管理)
     {
         _個体管理 = 個体管理;
-        新しいレースを作成();
+        現在のレース = レース生成();
+        予定レース補充();
+        状態通知();
+        レース切替時?.Invoke(現在のレース);
         _ループタイマー = new System.Timers.Timer(100); // 10 ticks per second
         _ループタイマー.Elapsed += ゲームループ;
         _ループタイマー.Start();
     }
 
-    private void 新しいレースを作成()
+    public IReadOnlyList<レース> 予定レース一覧 => _予定レースリスト;
+    public レース? 次のレース => _予定レースリスト.FirstOrDefault();
+
+    private void 予定レース補充()
+    {
+        while (_予定レースリスト.Count < 予定レース数)
+        {
+            _予定レースリスト.Add(レース生成());
+        }
+    }
+
+    private レース レース生成()
     {
         // ランダムにレースクラスを決定
         var r = _乱数.NextDouble();
@@ -80,45 +97,56 @@ public class レース運用サービス : IDisposable
             新レース.各馬の進捗[馬.Id] = 0;
         }
 
-        現在のレース = 新レース;
-        状態通知();
+        return 新レース;
     }
 
     public bool 出走登録(競走馬 自分の馬)
     {
-        if (現在のレース.状態 != レース状態.投票受付中) return false;
-        if (現在のレース.出走馬リスト.Any(h => h.Id == 自分の馬.Id)) return false; // 既に登録済み
+        var 対象レース = 次のレース;
+        if (対象レース == null) return false;
+        if (対象レース.状態 != レース状態.投票受付中) return false;
+        if (対象レース.出走馬リスト.Any(h => h.Id == 自分の馬.Id)) return false; // 既に登録済み
         
         // クラスチェック
         bool クラスOK = false;
         
         // 1. 完全一致
-        if (自分の馬.クラス == 現在のレース.クラス) クラスOK = true;
+        if (自分の馬.クラス == 対象レース.クラス) クラスOK = true;
         // 2. 新馬 -> 未勝利 はOK
-        if (自分の馬.クラス == 競走馬クラス.新馬 && 現在のレース.クラス == 競走馬クラス.未勝利) クラスOK = true;
+        if (自分の馬.クラス == 競走馬クラス.新馬 && 対象レース.クラス == 競走馬クラス.未勝利) クラスOK = true;
         // 3. オープン -> G1 はOK
-        if (自分の馬.クラス == 競走馬クラス.オープン && 現在のレース.グレード == レースグレード.G1) クラスOK = true;
+        if (自分の馬.クラス == 競走馬クラス.オープン && 対象レース.グレード == レースグレード.G1) クラスOK = true;
 
         if (!クラスOK) return false;
 
         // 枠があるか？なければNPCを1頭除外
-        if (現在のレース.出走馬リスト.Count >= 8)
+        if (対象レース.出走馬リスト.Count >= 8)
         {
-            var 除外馬 = 現在のレース.出走馬リスト.Last(); // 末尾（ランダム選出なので誰でもいい）
-            現在のレース.出走馬リスト.Remove(除外馬);
-            現在のレース.各馬の進捗.Remove(除外馬.Id);
+            var 除外馬 = 対象レース.出走馬リスト.Last(); // 末尾（ランダム選出なので誰でもいい）
+            対象レース.出走馬リスト.Remove(除外馬);
+            対象レース.各馬の進捗.Remove(除外馬.Id);
         }
 
-        現在のレース.出走馬リスト.Add(自分の馬);
-        現在のレース.各馬の進捗[自分の馬.Id] = 0;
+        対象レース.出走馬リスト.Add(自分の馬);
+        対象レース.各馬の進捗[自分の馬.Id] = 0;
         
         状態通知();
         return true;
     }
     
     private int _投票待機ティック = 0; 
-    private const int 投票期間ティック = 50;
+    private const int 投票期間ティック = 200;
     private int _回復ティック = 0;
+    
+    public int 投票残り秒
+    {
+        get
+        {
+            if (現在のレース.状態 != レース状態.投票受付中) return 0;
+            int 残りティック = Math.Max(0, 投票期間ティック - _投票待機ティック);
+            return (int)Math.Ceiling(残りティック / 10.0);
+        }
+    }
 
     private void ゲームループ(object? sender, ElapsedEventArgs e)
     {
@@ -136,6 +164,10 @@ public class レース運用サービス : IDisposable
             {
                 現在のレース.状態 = レース状態.出走中;
                 _投票待機ティック = 0;
+                状態通知();
+            }
+            else if (_投票待機ティック % 10 == 0)
+            {
                 状態通知();
             }
         }
@@ -238,10 +270,26 @@ public class レース運用サービス : IDisposable
                 レース終了時?.Invoke(現在のレース);
                 
                 // 次のレースへ
-                Task.Delay(5000).ContinueWith(_ => 新しいレースを作成());
+                Task.Delay(5000).ContinueWith(_ => 次のレースへ());
             }
             状態通知();
         }
+    }
+
+    private void 次のレースへ()
+    {
+        if (_予定レースリスト.Count == 0)
+        {
+            _予定レースリスト.Add(レース生成());
+        }
+
+        現在のレース = _予定レースリスト[0];
+        _予定レースリスト.RemoveAt(0);
+        _投票待機ティック = 0;
+        予定レース補充();
+
+        状態通知();
+        レース切替時?.Invoke(現在のレース);
     }
 
 

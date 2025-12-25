@@ -1,6 +1,7 @@
 ﻿@page "/"
 @inject レース運用サービス 運用
 @inject 財布サービス 財布
+@inject オッズ市場サービス オッズ
 @implements IDisposable
 
 <PageTitle>運用ダッシュボード</PageTitle>
@@ -12,22 +13,34 @@
     <MudItem xs="12" md="4">
         <MudPaper Class="pa-4" Elevation="3">
             <MudText Typo="Typo.h6">オッズ市場</MudText>
+            <MudText Typo="Typo.body2">投票残り: @運用.投票残り秒 秒</MudText>
+            <MudNumericField T="int" @bind-Value="_購入金額" Label="購入金額" Variant="Variant.Outlined"
+                             Min="100" Step="100" Immediate="true" Class="mb-2" />
             <MudTable Items="@運用.現在のレース.出走馬リスト" Dense="true" Hover="true" Striped="true">
                 <HeaderContent>
                     <MudTh>馬名</MudTh>
-                    <MudTh>倍率</MudTh>
+                    <MudTh>単勝</MudTh>
+                    <MudTh>複勝</MudTh>
                     <MudTh>投票</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="馬名">@context.名前</MudTd>
-                    <MudTd DataLabel="倍率">
-                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">x@(Math.Round(100.0 / context.スピード * 5.0, 1))</MudChip>
+                    <MudTd DataLabel="単勝">
+                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@表示オッズ(context.Id)</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="複勝">
+                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@表示複勝オッズ(context.Id)</MudChip>
                     </MudTd>
                     <MudTd>
                         <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Success" 
                                    Disabled="@(運用.現在のレース.状態 != レース状態.投票受付中)"
-                                   OnClick="@(() => 馬券購入(context))">
-                            ¥100
+                                   OnClick="@(() => 単勝購入(context))">
+                            単勝 ¥100
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Warning" Class="ml-2"
+                                   Disabled="@(運用.現在のレース.状態 != レース状態.投票受付中)"
+                                   OnClick="@(() => 複勝購入(context))">
+                            複勝 ¥100
                         </MudButton>
                     </MudTd>
                 </RowTemplate>
@@ -59,7 +72,7 @@
                      {
                          <MudListItem>
                              <MudText>
-                                 @馬券.馬名 (x@馬券.オッズ) - ¥@馬券.購入額
+                                 @馬券.種別 @馬券.馬名 (x@馬券.オッズ) - ¥@馬券.購入額
                                  @if(馬券.確定済み)
                                  {
                                      <MudChip T="string" Color="@(馬券.払戻金 > 0 ? Color.Success : Color.Error)" Size="Size.Small" Class="ml-2">
@@ -83,21 +96,90 @@
     </MudItem>
 </MudGrid>
 
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6">レース収支</MudText>
+            @if (オッズ.収支履歴.Any())
+            {
+                <MudTable Items="@オッズ.収支履歴.Take(5)" Dense="true" Hover="true" Striped="true">
+                    <HeaderContent>
+                        <MudTh>レース</MudTh>
+                        <MudTh>売上</MudTh>
+                        <MudTh>払戻</MudTh>
+                        <MudTh>利益</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="レース">@context.レース名</MudTd>
+                        <MudTd DataLabel="売上">¥@context.総売上.ToString("0")</MudTd>
+                        <MudTd DataLabel="払戻">¥@context.総払戻.ToString("0")</MudTd>
+                        <MudTd DataLabel="利益">
+                            <MudChip T="string" Color="@(context.利益 >= 0 ? Color.Success : Color.Error)" Size="Size.Small">
+                                ¥@context.利益.ToString("0")
+                            </MudChip>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+            else
+            {
+                <MudText>レース収支はまだありません。</MudText>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
 @code {
     protected override void OnInitialized()
     {
-        運用.レース状態変更時 += StateHasChanged;
-        財布.残高変動時 += StateHasChanged;
+        運用.レース状態変更時 += Onレース更新;
+        財布.残高変動時 += On残高更新;
+        オッズ.オッズ変動時 += Onオッズ更新;
+        オッズ.収支更新時 += On収支更新;
     }
 
     public void Dispose()
     {
-        運用.レース状態変更時 -= StateHasChanged;
-        財布.残高変動時 -= StateHasChanged;
+        運用.レース状態変更時 -= Onレース更新;
+        財布.残高変動時 -= On残高更新;
+        オッズ.オッズ変動時 -= Onオッズ更新;
+        オッズ.収支更新時 -= On収支更新;
     }
 
-    private void 馬券購入(競走馬 馬)
+    private void 単勝購入(競走馬 馬)
     {
-        財布.馬券購入(運用.現在のレース, 馬, 100);
+        財布.馬券購入(運用.現在のレース, 馬, 購入金額(), 券種.単勝);
     }
+
+    private MarkupString 表示オッズ(string 馬Id)
+    {
+        var odds = オッズ.現在オッズ(馬Id);
+        var text = odds <= 0 ? "x-" : $"x{odds:0.0}";
+        return new MarkupString(text);
+    }
+
+    private void 複勝購入(競走馬 馬)
+    {
+        財布.馬券購入(運用.現在のレース, 馬, 購入金額(), 券種.複勝);
+    }
+
+    private MarkupString 表示複勝オッズ(string 馬Id)
+    {
+        var odds = オッズ.現在複勝オッズ(馬Id);
+        var text = odds <= 0 ? "x-" : $"x{odds:0.0}";
+        return new MarkupString(text);
+    }
+
+    private int _購入金額 = 100;
+
+    private decimal 購入金額()
+    {
+        if (_購入金額 <= 0) return 0m;
+        return Math.Max(100, _購入金額);
+    }
+
+    private void Onレース更新() => InvokeAsync(StateHasChanged);
+    private void On残高更新() => InvokeAsync(StateHasChanged);
+    private void Onオッズ更新() => InvokeAsync(StateHasChanged);
+    private void On収支更新() => InvokeAsync(StateHasChanged);
 }

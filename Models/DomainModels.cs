@@ -7,6 +7,7 @@ public enum 競走馬クラス { 新馬, 未勝利, 一勝クラス, 二勝ク�
 public enum レースグレード { 一般, G3, G2, G1 }
 public enum 脚質 { 逃げ, 先行, 差し, 追込 }
 public enum コース種別 { 芝, ダート, 障害, サイバー空間 }
+public enum 券種 { 単勝, 複勝, ワイド, 馬連, 馬単, 三連複, 三連単 }
 
 public class 競走馬
 {
@@ -54,7 +55,7 @@ public class レース
 
 public class 相場師
 {
-    public decimal 所持金 { get; set; } = 10000m;
+    public decimal 所持金 { get; set; } = 1000000000000m;
     public List<競走馬> 所有馬リスト { get; set; } = new();
     public List<馬券> 購入馬券リスト { get; set; } = new();
 }
@@ -64,8 +65,24 @@ public class 馬券
     public string レースId { get; set; } = "";
     public string 馬Id { get; set; } = "";
     public string 馬名 { get; set; } = ""; // 表示用スナップショット
+    public 券種 種別 { get; set; } = 券種.単勝;
+    public List<string> 対象馬Idリスト { get; set; } = new();
     public decimal 購入額 { get; set; }
     public decimal オッズ { get; set; }
     public bool 確定済み { get; set; }
     public decimal 払戻金 { get; set; }
+}
+
+public class レース収支
+{
+    public string レースId { get; set; } = "";
+    public string レース名 { get; set; } = "";
+    public DateTime 確定時刻 { get; set; } = DateTime.Now;
+    public decimal 単勝総売上 { get; set; }
+    public decimal 複勝総売上 { get; set; }
+    public decimal 単勝払戻合計 { get; set; }
+    public decimal 複勝払戻合計 { get; set; }
+    public decimal 総売上 => 単勝総売上 + 複勝総売上;
+    public decimal 総払戻 => 単勝払戻合計 + 複勝払戻合計;
+    public decimal 利益 => 総売上 - 総払戻;
 }
