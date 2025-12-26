@@ -19,6 +19,7 @@ public class 競走馬
     // ステータス (0-100)
     public int スピード { get; set; }
     public int スタミナ { get; set; }
+    public int 加速力 { get; set; } = 50; // 0-100
     public 脚質 脚質 { get; set; } = 脚質.先行;
     public int ゲート { get; set; }
     public int 調子 { get; set; } = 100;
@@ -52,6 +53,11 @@ public class レース
     
     // シミュレーション用
     public Dictionary<string, double> 各馬の進捗 { get; set; } = new();
+    public Dictionary<string, double> 各馬の横位置 { get; set; } = new();
+    public Dictionary<string, bool> 各馬の不発フラグ { get; set; } = new();
+    public Dictionary<string, double> 各馬の現在速度 { get; set; } = new();
+    public Dictionary<string, int> 各馬のスタート遅延ティック { get; set; } = new();
+    public Dictionary<string, double> 各馬のスタミナ残量 { get; set; } = new();
     public List<string> 着順 { get; set; } = new();
 }
 

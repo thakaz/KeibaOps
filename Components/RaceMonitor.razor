@@ -35,17 +35,21 @@
             <!-- Finish Line -->
             <div style="position: absolute; right: 0; top: 0; bottom: 0; width: 4px; background-color: white; z-index: 1;"></div>
 
+            @{
+                var topMap = 走行トップ位置を算出();
+            }
+
             @foreach (var 馬 in 運用.現在のレース.出走馬リスト)
             {
                 var 進捗 = 運用.現在のレース.各馬の進捗.ContainsKey(馬.Id) ? 運用.現在のレース.各馬の進捗[馬.Id] * 100 : 0; // 0 to 100% width
-                var 上位置 = 運用.現在のレース.出走馬リスト.IndexOf(馬) * 45 + 20;
+                var 横位置 = 運用.現在のレース.各馬の横位置.ContainsKey(馬.Id) ? 運用.現在のレース.各馬の横位置[馬.Id] : 0.5;
+                var 上位置 = topMap.TryGetValue(馬.Id, out var t) ? t : 20 + (横位置 * 320);
 
-                <div style="position: absolute; left: 0; right: 0; top: @(上位置)px; height: 40px;">
+                <div style="position: absolute; left: 0; right: 0; top: @(上位置)px; height: 40px; transition: top 0.2s ease;">
                     <div style="position: absolute; left: @(進捗)% ; transform: translateX(-100%); display: flex; align-items: center; gap: 8px; transition: left 0.1s linear; white-space: nowrap; flex-direction: row-reverse;">
-                        <MudIcon Icon="@Icons.Material.Filled.SportsScore" Style="@($"color: {馬.毛色}; font-size: 32px;")" />
+                        <MudIcon Icon="@Icons.Material.Filled.SportsScore" Style="@($"color: {馬.毛色}; font-size: 30px;")" />
                         <MudText Typo="Typo.caption" Style="color: white; white-space: nowrap;">@馬.名前</MudText>
                     </div>
-                    <div style="position: absolute; left: 0; right: 0; top: 28px; height: 1px; background-color: #555;"></div>
                 </div>
             }
         </div>
@@ -66,6 +70,45 @@
     public void Dispose()
     {
         運用.レース状態変更時 -= 状態変更処理;
+    }
+
+    private Dictionary<string, double> 走行トップ位置を算出()
+    {
+        const double trackHeight = 400;
+        const double margin = 20;
+        const double minGap = 34;
+
+        var list = 運用.現在のレース.出走馬リスト
+            .Select(h =>
+            {
+                var 横位置 = 運用.現在のレース.各馬の横位置.ContainsKey(h.Id) ? 運用.現在のレース.各馬の横位置[h.Id] : 0.5;
+                var ideal = margin + (横位置 * (trackHeight - (margin * 2)));
+                return new { h.Id, Ideal = ideal };
+            })
+            .OrderBy(x => x.Ideal)
+            .ToList();
+
+        var result = new Dictionary<string, double>();
+        double prev = double.NegativeInfinity;
+        foreach (var item in list)
+        {
+            var top = item.Ideal;
+            if (top - prev < minGap) top = prev + minGap;
+            result[item.Id] = top;
+            prev = top;
+        }
+
+        double maxTop = trackHeight - margin;
+        double overflow = result.Values.Max() - maxTop;
+        if (overflow > 0)
+        {
+            foreach (var key in result.Keys.ToList())
+            {
+                result[key] = Math.Max(margin, result[key] - overflow);
+            }
+        }
+
+        return result;
     }
 
 }
